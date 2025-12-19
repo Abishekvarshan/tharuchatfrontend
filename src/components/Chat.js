@@ -15,11 +15,14 @@ function Chat({ messages, socket, currentUserId, addMessage }) {
   const handleSend = () => {
     if (input.trim() === '' || !socket || !currentUserId) return;
 
-    // Add message locally for immediate display
+    console.log('Sending message:', input);
+
+    // Send to server first
+    socket.emit('chat-message', input);
+
+    // Add message locally for immediate display (backend will echo back to other user)
     addMessage({ text: input, sender: currentUserId });
 
-    // Send to server
-    socket.emit('chat-message', input);
     setInput('');
   };
 
