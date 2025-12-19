@@ -9,6 +9,7 @@ function VideoCallOverlay({
 }) {
   const [isFullscreen, setIsFullscreen] = useState(initialFullscreen);
   const [isCalling, setIsCalling] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [primaryLocal, setPrimaryLocal] = useState(false);
@@ -38,8 +39,10 @@ function VideoCallOverlay({
     };
 
     pc.ontrack = (event) => {
+      console.log('Remote stream received:', event.streams[0]);
       if (remoteVideoRef.current && event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0];
+        console.log('Set remote video srcObject');
       }
     };
 
@@ -59,32 +62,17 @@ function VideoCallOverlay({
 
     socket.on('webrtc-offer', async ({ sdp }) => {
       try {
-        if (!peerConnectionRef.current) {
-          createPeerConnection();
-        }
+        console.log('Received offer, processing...');
 
         // Set remote description (offer)
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
-
-        // Get local media if not already done
-        if (!stream) {
-          const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          setStream(mediaStream);
-
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = mediaStream;
-          }
-
-          // Add tracks to peer connection
-          mediaStream.getTracks().forEach((track) =>
-            peerConnectionRef.current.addTrack(track, mediaStream)
-          );
-        }
+        console.log('Set remote description');
 
         // Create and send answer
         const answer = await peerConnectionRef.current.createAnswer();
         await peerConnectionRef.current.setLocalDescription(answer);
         socket.emit('webrtc-answer', { sdp: answer });
+        console.log('Sent answer');
       } catch (err) {
         console.error('Error handling offer:', err);
       }
@@ -120,24 +108,25 @@ function VideoCallOverlay({
     if (!socket || isCalling) return;
 
     try {
-      // For receivers, media is handled in the offer handler
-      // For callers, we need to get media and create offer
+      // Always get local media first for both caller and receiver
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setStream(mediaStream);
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = mediaStream;
+      }
+
+      if (!peerConnectionRef.current) {
+        createPeerConnection();
+      }
+
+      // Add tracks to peer connection for both
+      mediaStream.getTracks().forEach((track) =>
+        peerConnectionRef.current.addTrack(track, mediaStream)
+      );
+
+      // Only caller creates and sends offer
       if (!isReceiver) {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        setStream(mediaStream);
-
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = mediaStream;
-        }
-
-        if (!peerConnectionRef.current) {
-          createPeerConnection();
-        }
-
-        mediaStream.getTracks().forEach((track) =>
-          peerConnectionRef.current.addTrack(track, mediaStream)
-        );
-
         socket.emit('incoming-call'); // notify receiver
         const offer = await peerConnectionRef.current.createOffer();
         await peerConnectionRef.current.setLocalDescription(offer);
