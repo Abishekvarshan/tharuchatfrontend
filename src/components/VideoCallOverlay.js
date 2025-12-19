@@ -29,10 +29,16 @@ function VideoCallOverlay({
 
   // Helper function to create a properly configured peer connection
   const createPeerConnection = () => {
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
     peerConnectionRef.current = pc;
 
     pc.onicecandidate = (event) => {
+      console.log('ICE candidate:', event.candidate);
       if (event.candidate && socket) {
         socket.emit('ice-candidate', { candidate: event.candidate });
       }
@@ -40,10 +46,21 @@ function VideoCallOverlay({
 
     pc.ontrack = (event) => {
       console.log('Remote stream received:', event.streams[0]);
+      console.log('Remote video ref current:', remoteVideoRef.current);
       if (remoteVideoRef.current && event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0];
         console.log('Set remote video srcObject');
+      } else {
+        console.log('Remote video ref not ready or no stream');
       }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('Connection state:', pc.connectionState);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('ICE connection state:', pc.iceConnectionState);
     };
 
     return pc;
@@ -51,10 +68,10 @@ function VideoCallOverlay({
 
   // Auto-start call if receiver or caller
   useEffect(() => {
-    if (!isCalling) {
+    if (!isCalling && localVideoRef.current && remoteVideoRef.current) {
       startCall(isReceiver);
     }
-  }, []);
+  }, []); // Only run once on mount
 
   // WebRTC signaling
   useEffect(() => {
