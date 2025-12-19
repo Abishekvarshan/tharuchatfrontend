@@ -58,19 +58,45 @@ function VideoCallOverlay({
     if (!socket) return;
 
     socket.on('webrtc-offer', async ({ sdp }) => {
-      if (!peerConnectionRef.current) {
-        createPeerConnection();
-      }
+      try {
+        if (!peerConnectionRef.current) {
+          createPeerConnection();
+        }
 
-      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
-      const answer = await peerConnectionRef.current.createAnswer();
-      await peerConnectionRef.current.setLocalDescription(answer);
-      socket.emit('webrtc-answer', { sdp: answer });
+        // Set remote description (offer)
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+
+        // Get local media if not already done
+        if (!stream) {
+          const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          setStream(mediaStream);
+
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = mediaStream;
+          }
+
+          // Add tracks to peer connection
+          mediaStream.getTracks().forEach((track) =>
+            peerConnectionRef.current.addTrack(track, mediaStream)
+          );
+        }
+
+        // Create and send answer
+        const answer = await peerConnectionRef.current.createAnswer();
+        await peerConnectionRef.current.setLocalDescription(answer);
+        socket.emit('webrtc-answer', { sdp: answer });
+      } catch (err) {
+        console.error('Error handling offer:', err);
+      }
     });
 
     socket.on('webrtc-answer', async ({ sdp }) => {
-      if (peerConnectionRef.current) {
-        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+      try {
+        if (peerConnectionRef.current) {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+        }
+      } catch (err) {
+        console.error('Error handling answer:', err);
       }
     });
 
@@ -88,28 +114,30 @@ function VideoCallOverlay({
       socket.off('webrtc-answer');
       socket.off('ice-candidate');
     };
-  }, [socket]);
+  }, [socket, stream]);
 
   const startCall = async (isReceiver = false) => {
     if (!socket || isCalling) return;
 
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setStream(mediaStream);
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = mediaStream;
-      }
-
-      if (!peerConnectionRef.current) {
-        createPeerConnection();
-      }
-
-      mediaStream.getTracks().forEach((track) =>
-        peerConnectionRef.current.addTrack(track, mediaStream)
-      );
-
+      // For receivers, media is handled in the offer handler
+      // For callers, we need to get media and create offer
       if (!isReceiver) {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setStream(mediaStream);
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = mediaStream;
+        }
+
+        if (!peerConnectionRef.current) {
+          createPeerConnection();
+        }
+
+        mediaStream.getTracks().forEach((track) =>
+          peerConnectionRef.current.addTrack(track, mediaStream)
+        );
+
         socket.emit('incoming-call'); // notify receiver
         const offer = await peerConnectionRef.current.createOffer();
         await peerConnectionRef.current.setLocalDescription(offer);
