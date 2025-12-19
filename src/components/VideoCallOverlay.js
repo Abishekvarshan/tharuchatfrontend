@@ -67,12 +67,12 @@ function VideoCallOverlay({
     return pc;
   };
 
-  // Auto-start call if receiver or caller
+  // Only start call when explicitly triggered (not on component mount)
   useEffect(() => {
-    if (!isCalling && localVideoRef.current && remoteVideoRef.current) {
+    if (isVisible && !isCalling && localVideoRef.current && remoteVideoRef.current) {
       startCall(isReceiver);
     }
-  }, []); // Only run once on mount
+  }, [isVisible]); // Run when overlay becomes visible
 
   // WebRTC signaling
   useEffect(() => {
@@ -81,6 +81,26 @@ function VideoCallOverlay({
     socket.on('webrtc-offer', async ({ sdp }) => {
       try {
         console.log('Received offer, processing...');
+
+        // Get local media for receiver
+        if (!stream) {
+          const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          setStream(mediaStream);
+
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = mediaStream;
+          }
+
+          // Create peer connection if needed
+          if (!peerConnectionRef.current) {
+            createPeerConnection();
+          }
+
+          // Add tracks to peer connection
+          mediaStream.getTracks().forEach((track) =>
+            peerConnectionRef.current.addTrack(track, mediaStream)
+          );
+        }
 
         // Set remote description (offer)
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
@@ -91,6 +111,9 @@ function VideoCallOverlay({
         await peerConnectionRef.current.setLocalDescription(answer);
         socket.emit('webrtc-answer', { sdp: answer });
         console.log('Sent answer');
+
+        // Mark as calling for receiver
+        setIsCalling(true);
       } catch (err) {
         console.error('Error handling offer:', err);
       }
@@ -126,32 +149,34 @@ function VideoCallOverlay({
     if (!socket || isCalling) return;
 
     try {
-      // Always get local media first for both caller and receiver
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setStream(mediaStream);
+      // Only get media for callers (receivers get media in offer handler)
+      if (!isReceiver && !stream) {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setStream(mediaStream);
 
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = mediaStream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = mediaStream;
+        }
+
+        if (!peerConnectionRef.current) {
+          createPeerConnection();
+        }
+
+        // Add tracks to peer connection
+        mediaStream.getTracks().forEach((track) =>
+          peerConnectionRef.current.addTrack(track, mediaStream)
+        );
       }
 
-      if (!peerConnectionRef.current) {
-        createPeerConnection();
-      }
-
-      // Add tracks to peer connection for both
-      mediaStream.getTracks().forEach((track) =>
-        peerConnectionRef.current.addTrack(track, mediaStream)
-      );
-
-      // Only caller creates and sends offer
+      // Only caller creates and sends offer (receivers handle offers via socket listener)
       if (!isReceiver) {
         socket.emit('incoming-call'); // notify receiver
         const offer = await peerConnectionRef.current.createOffer();
         await peerConnectionRef.current.setLocalDescription(offer);
         socket.emit('webrtc-offer', { sdp: offer });
+        setIsCalling(true);
       }
 
-      setIsCalling(true);
       setPrimaryLocal(false); // remote video starts as primary
     } catch (err) {
       console.error('Error accessing media devices', err);
