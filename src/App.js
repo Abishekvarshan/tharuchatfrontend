@@ -31,6 +31,8 @@ function App() {
       setMessages((prev) => [...prev, msg]);
     });
 
+
+
     // Incoming call prompt
     newSocket.on('incoming-call', () => {
       const accept = window.confirm('Incoming video call. Accept?');
@@ -92,13 +94,12 @@ function App() {
 
       <Chat messages={messages} socket={socket} currentUserId={currentUserId} addMessage={addMessage} />
 
-      {showVideoOverlay && (
-        <VideoCallOverlay
-          socket={socket}
-          onClose={handleCloseVideoOverlay}
-          isReceiver={isReceiver}
-        />
-      )}
+      <VideoCallOverlay
+        socket={socket}
+        onClose={handleCloseVideoOverlay}
+        isReceiver={isReceiver}
+        isVisible={showVideoOverlay}
+      />
     </div>
   );
 }

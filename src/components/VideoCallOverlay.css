@@ -7,6 +7,10 @@
   transition: all 0.3s ease;
 }
 
+.video-overlay.hidden {
+  display: none;
+}
+
 .video-overlay.fullscreen {
   width: 100vw;
   height: 100vh;

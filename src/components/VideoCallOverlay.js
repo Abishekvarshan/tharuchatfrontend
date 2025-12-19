@@ -5,7 +5,8 @@ function VideoCallOverlay({
   socket,
   onClose,
   initialFullscreen = true,
-  isReceiver = false
+  isReceiver = false,
+  isVisible = false
 }) {
   const [isFullscreen, setIsFullscreen] = useState(initialFullscreen);
   const [isCalling, setIsCalling] = useState(false);
@@ -199,7 +200,7 @@ function VideoCallOverlay({
   const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
 
   return (
-    <div className={`video-overlay ${isFullscreen ? 'fullscreen' : 'minimized'}`}>
+    <div className={`video-overlay ${isFullscreen ? 'fullscreen' : 'minimized'} ${!isVisible ? 'hidden' : ''}`}>
       <div className="video-controls">
         <button onClick={toggleFullscreen}>
           {isFullscreen ? '⬜' : '🔳'}
