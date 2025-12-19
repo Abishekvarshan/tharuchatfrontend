@@ -10,6 +10,7 @@ const SOCKET_SERVER_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost
 function App() {
   const [socket, setSocket] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
   const [showVideoOverlay, setShowVideoOverlay] = useState(false);
   const [isReceiver, setIsReceiver] = useState(false);
@@ -19,6 +20,7 @@ function App() {
   useEffect(() => {
     const newSocket = io(SOCKET_SERVER_URL);
     setSocket(newSocket);
+    setCurrentUserId(newSocket.id);
 
     newSocket.emit('join-room', roomID);
 
@@ -63,6 +65,10 @@ function App() {
     setShowVideoOverlay(true);
   };
 
+  const addMessage = (message) => {
+    setMessages((prev) => [...prev, message]);
+  };
+
   const handleCloseVideoOverlay = () => {
     setShowVideoOverlay(false);
     setIsReceiver(false);
@@ -76,11 +82,11 @@ function App() {
           <button onClick={handleVideoCallClick}>📹</button>
           <button onClick={toggleDarkMode}>
             {darkMode ? '🌙' : '☀️'}
-          </button>
+            </button>
         </div>
       </header>
 
-      <Chat messages={messages} socket={socket} />
+      <Chat messages={messages} socket={socket} currentUserId={currentUserId} addMessage={addMessage} />
 
       {showVideoOverlay && (
         <VideoCallOverlay

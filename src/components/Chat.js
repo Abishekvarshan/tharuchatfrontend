@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Chat.css'; // optional CSS for chat styling
 
-function Chat({ messages, socket }) {
+function Chat({ messages, socket, currentUserId, addMessage }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -13,7 +13,12 @@ function Chat({ messages, socket }) {
   }, [messages]);
 
   const handleSend = () => {
-    if (input.trim() === '' || !socket) return;
+    if (input.trim() === '' || !socket || !currentUserId) return;
+
+    // Add message locally for immediate display
+    addMessage({ text: input, sender: currentUserId });
+
+    // Send to server
     socket.emit('chat-message', input);
     setInput('');
   };
@@ -25,11 +30,21 @@ function Chat({ messages, socket }) {
   return (
     <div className="chat-container">
       <div className="messages">
-        {messages.map((msg, idx) => (
-          <div key={idx} className="message">
-            {msg}
-          </div>
-        ))}
+        {messages.map((msg, idx) => {
+          // Handle both old string format and new object format
+          const messageText = typeof msg === 'string' ? msg : msg.text;
+          const senderId = typeof msg === 'string' ? null : msg.sender;
+          const isOwnMessage = senderId === currentUserId;
+
+          return (
+            <div
+              key={idx}
+              className={`message ${isOwnMessage ? 'own-message' : 'other-message'}`}
+            >
+              {messageText}
+            </div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
       <div className="chat-input">
