@@ -20,9 +20,12 @@ function App() {
   useEffect(() => {
     const newSocket = io(SOCKET_SERVER_URL);
     setSocket(newSocket);
-    setCurrentUserId(newSocket.id);
 
-    newSocket.emit('join-room', roomID);
+    // Set currentUserId when socket connects
+    newSocket.on('connect', () => {
+      setCurrentUserId(newSocket.id);
+      newSocket.emit('join-room', roomID);
+    });
 
     newSocket.on('chat-message', (msg) => {
       setMessages((prev) => [...prev, msg]);
