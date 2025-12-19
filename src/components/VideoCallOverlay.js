@@ -26,6 +26,28 @@ function VideoCallOverlay({
     setIsFullscreen(isMobile);
   }, [isMobile]);
 
+  // Helper function to create a properly configured peer connection
+  const createPeerConnection = () => {
+    const pc = new RTCPeerConnection();
+    peerConnectionRef.current = pc;
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socket) {
+        socket.emit('ice-candidate', { candidate: event.candidate });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      console.log('Received remote stream', event.streams[0]);
+      if (remoteVideoRef.current && event.streams[0]) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+        console.log('Set remote video srcObject');
+      }
+    };
+
+    return pc;
+  };
+
   // Auto-start call if receiver or caller
   useEffect(() => {
     if (!isCalling) {
@@ -39,21 +61,7 @@ function VideoCallOverlay({
 
     socket.on('webrtc-offer', async ({ sdp }) => {
       if (!peerConnectionRef.current) {
-        const pc = new RTCPeerConnection();
-        peerConnectionRef.current = pc;
-
-        pc.onicecandidate = (event) => {
-          if (event.candidate && socket) {
-            socket.emit('ice-candidate', { candidate: event.candidate });
-          }
-        };
-
-        pc.ontrack = (event) => {
-          console.log('Received remote stream');
-          if (remoteVideoRef.current && event.streams[0]) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
-        };
+        createPeerConnection();
       }
 
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
@@ -96,20 +104,7 @@ function VideoCallOverlay({
       }
 
       if (!peerConnectionRef.current) {
-        const pc = new RTCPeerConnection();
-        peerConnectionRef.current = pc;
-
-        pc.onicecandidate = (event) => {
-          if (event.candidate && socket) {
-            socket.emit('ice-candidate', { candidate: event.candidate });
-          }
-        };
-
-        pc.ontrack = (event) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
-        };
+        createPeerConnection();
       }
 
       mediaStream.getTracks().forEach((track) =>
