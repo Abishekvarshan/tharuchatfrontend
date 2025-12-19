@@ -38,10 +38,8 @@ function VideoCallOverlay({
     };
 
     pc.ontrack = (event) => {
-      console.log('Received remote stream', event.streams[0]);
       if (remoteVideoRef.current && event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0];
-        console.log('Set remote video srcObject');
       }
     };
 

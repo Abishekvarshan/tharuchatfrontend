@@ -15,8 +15,6 @@ function Chat({ messages, socket, currentUserId, addMessage }) {
   const handleSend = () => {
     if (input.trim() === '' || !socket || !currentUserId) return;
 
-    console.log('Sending message:', input);
-
     // Send to server first
     socket.emit('chat-message', input);
 

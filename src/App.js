@@ -28,7 +28,6 @@ function App() {
     });
 
     newSocket.on('chat-message', (msg) => {
-      console.log('Received message from backend:', msg);
       setMessages((prev) => [...prev, msg]);
     });
 
