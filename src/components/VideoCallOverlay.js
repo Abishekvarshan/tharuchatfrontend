@@ -26,36 +26,36 @@ function VideoCallOverlay({
     setIsFullscreen(isMobile);
   }, [isMobile]);
 
-  // Auto-start call if receiver
+  // Auto-start call if receiver or caller
   useEffect(() => {
-    if (isReceiver && !isCalling) {
-      startCall(true);
+    if (!isCalling) {
+      startCall(isReceiver);
     }
-  }, [isReceiver]);
+  }, []);
 
   // WebRTC signaling
   useEffect(() => {
     if (!socket) return;
 
-    const createPeerConnection = () => {
-      const pc = new RTCPeerConnection();
-      peerConnectionRef.current = pc;
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate && socket) {
-          socket.emit('ice-candidate', { candidate: event.candidate });
-        }
-      };
-
-      pc.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
-    };
-
     socket.on('webrtc-offer', async ({ sdp }) => {
-      if (!peerConnectionRef.current) createPeerConnection();
+      if (!peerConnectionRef.current) {
+        const pc = new RTCPeerConnection();
+        peerConnectionRef.current = pc;
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate && socket) {
+            socket.emit('ice-candidate', { candidate: event.candidate });
+          }
+        };
+
+        pc.ontrack = (event) => {
+          console.log('Received remote stream');
+          if (remoteVideoRef.current && event.streams[0]) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+          }
+        };
+      }
+
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
       const answer = await peerConnectionRef.current.createAnswer();
       await peerConnectionRef.current.setLocalDescription(answer);
@@ -63,7 +63,9 @@ function VideoCallOverlay({
     });
 
     socket.on('webrtc-answer', async ({ sdp }) => {
-      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+      if (peerConnectionRef.current) {
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+      }
     });
 
     socket.on('ice-candidate', async ({ candidate }) => {
@@ -183,10 +185,7 @@ function VideoCallOverlay({
           </>
         )}
         {!isCalling && (
-          <>
-            <button onClick={() => startCall(false)}>📹</button>
-            <button onClick={onClose}>❌</button>
-          </>
+          <button onClick={onClose}>❌</button>
         )}
       </div>
       <div className="video-wrapper">

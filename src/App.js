@@ -66,6 +66,7 @@ function App() {
 
   const handleVideoCallClick = () => {
     setShowVideoOverlay(true);
+    setIsReceiver(false); // Set as caller
   };
 
   const addMessage = (message) => {
