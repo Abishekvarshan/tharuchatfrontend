@@ -15,6 +15,7 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
   const hasInitialScrollRef = useRef(false);
   const readObserverRef = useRef(null);
   const readQueuedRef = useRef(new Set());
+  const keepLatestVisibleRef = useRef(false);
   const [composerHeight, setComposerHeight] = useState(64);
 
   const isNearBottom = useCallback(() => {
@@ -29,6 +30,14 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     messagePanel.scrollTo({ top: messagePanel.scrollHeight, behavior });
     setNewMessageCount(0);
   }, []);
+
+  const settleLatestMessages = useCallback(() => {
+    [0, 80, 180, 360].forEach((delay) => {
+      window.setTimeout(() => {
+        requestAnimationFrame(() => scrollToBottom('auto'));
+      }, delay);
+    });
+  }, [scrollToBottom]);
 
   useEffect(() => {
     const previousMessages = previousMessagesRef.current;
@@ -73,8 +82,8 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     if (!viewport) return undefined;
 
     const keepFocusedInputVisible = () => {
-      if (document.activeElement === inputRef.current && isNearBottom()) {
-        requestAnimationFrame(() => scrollToBottom('auto'));
+      if (document.activeElement === inputRef.current && keepLatestVisibleRef.current) {
+        settleLatestMessages();
       }
     };
 
@@ -85,7 +94,7 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
       viewport.removeEventListener('resize', keepFocusedInputVisible);
       viewport.removeEventListener('scroll', keepFocusedInputVisible);
     };
-  }, [isNearBottom, scrollToBottom]);
+  }, [settleLatestMessages]);
 
   useEffect(() => {
     const messagePanel = messagesRef.current;
@@ -138,6 +147,9 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
 
     const updateComposerHeight = () => {
       setComposerHeight(composer.offsetHeight);
+      if (document.activeElement === inputRef.current && keepLatestVisibleRef.current) {
+        requestAnimationFrame(() => scrollToBottom('auto'));
+      }
     };
 
     updateComposerHeight();
@@ -151,7 +163,7 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     observer.observe(composer);
 
     return () => observer.disconnect();
-  }, []);
+  }, [scrollToBottom]);
 
   useEffect(() => () => {
     clearTimeout(typingTimeoutRef.current);
@@ -201,6 +213,15 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
       clearTimeout(typingTimeoutRef.current);
       onTypingChange?.(false);
     }
+  };
+
+  const handleInputFocus = () => {
+    keepLatestVisibleRef.current = isNearBottom() || messages.length > 0;
+    settleLatestMessages();
+  };
+
+  const handleInputBlur = () => {
+    keepLatestVisibleRef.current = false;
   };
 
   const getMessageDetails = (msg) => ({
@@ -353,6 +374,8 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
             placeholder="Type a message..."
             value={input}
             onChange={handleInputChange}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
             onKeyPress={handleKeyPress}
           />
           <button type="submit" onMouseDown={(event) => event.preventDefault()}>Send</button>
