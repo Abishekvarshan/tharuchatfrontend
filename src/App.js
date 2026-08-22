@@ -9,7 +9,7 @@ import {
   set,
   update,
 } from 'firebase/database';
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDailyRoomID } from './utils';
 import Chat from './components/Chat';
 import VideoCallOverlay from './components/VideoCallOverlay';
@@ -77,7 +77,22 @@ function App() {
         );
 
         unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
-          setMessages(snapshot.docs.map((message) => ({ id: message.id, ...message.data() })));
+          const nextMessages = snapshot.docs.map((message) => ({ id: message.id, ...message.data() }));
+          setMessages(nextMessages);
+
+          nextMessages
+            .filter((message) => (
+              message.sender !== user.uid
+              && !message.deliveredTo?.[user.uid]
+            ))
+            .forEach((message) => {
+              updateDoc(doc(db, 'rooms', roomID, 'messages', message.id), {
+                [`deliveredTo.${user.uid}`]: true,
+                deliveredAt: serverTimestamp(),
+              }).catch((error) => {
+                console.error('Message delivery status could not be saved:', error);
+              });
+            });
         });
       } else if (user) {
         setAuthError('This Google account is not allowed to use this chat.');
@@ -197,6 +212,8 @@ function App() {
         text: message.text,
         sender: message.sender,
         replyTo: message.replyTo || null,
+        deliveredTo: {},
+        readBy: {},
         createdAt: serverTimestamp(),
       });
     } catch (error) {
@@ -225,6 +242,20 @@ function App() {
       console.error('Typing status could not be saved:', error);
     }
   }, [currentUser, currentUserId, roomID]);
+
+  const markMessageRead = useCallback(async (messageId) => {
+    if (!currentUserId || !messageId) return;
+
+    try {
+      await updateDoc(doc(db, 'rooms', roomID, 'messages', messageId), {
+        [`deliveredTo.${currentUserId}`]: true,
+        [`readBy.${currentUserId}`]: true,
+        readAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Message read status could not be saved:', error);
+    }
+  }, [currentUserId, roomID]);
 
   const handleCloseVideoOverlay = () => {
     setShowVideoOverlay(false);
@@ -303,6 +334,7 @@ function App() {
         addMessage={addMessage}
         typingUsers={typingUsers}
         onTypingChange={handleTypingChange}
+        onMessageRead={markMessageRead}
       />
 
       {incomingCall && !showVideoOverlay && (

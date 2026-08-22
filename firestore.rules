@@ -2,11 +2,19 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /rooms/{roomId}/messages/{messageId} {
-      allow read, create: if request.auth != null
+    function isAllowedUser() {
+      return request.auth != null
         && (request.auth.token.email == 'varsityabi@gmail.com'
           || request.auth.token.email == 'shamilyrathnakumar@gmail.com');
-      allow update, delete: if false;
+    }
+
+    match /rooms/{roomId}/messages/{messageId} {
+      allow read, create: if isAllowedUser();
+      allow update: if isAllowedUser()
+        && request.auth.uid != resource.data.sender
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['deliveredTo', 'deliveredAt', 'readBy', 'readAt']);
+      allow delete: if false;
     }
   }
 }

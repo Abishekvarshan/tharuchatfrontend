@@ -1,26 +1,156 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './Chat.css'; // optional CSS for chat styling
 
-function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingChange }) {
+function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingChange, onMessageRead }) {
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [newMessageCount, setNewMessageCount] = useState(0);
   const messagesRef = useRef(null);
+  const composerRef = useRef(null);
   const touchStartRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const previousMessagesRef = useRef([]);
+  const hasInitialScrollRef = useRef(false);
+  const readObserverRef = useRef(null);
+  const readQueuedRef = useRef(new Set());
+  const [composerHeight, setComposerHeight] = useState(64);
 
-  // Keep scrolling inside the message panel, not the whole chat page.
+  const isNearBottom = useCallback(() => {
+    const messagePanel = messagesRef.current;
+    if (!messagePanel) return true;
+    return messagePanel.scrollHeight - messagePanel.scrollTop - messagePanel.clientHeight < 72;
+  }, []);
+
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
+    const messagePanel = messagesRef.current;
+    if (!messagePanel) return;
+    messagePanel.scrollTo({ top: messagePanel.scrollHeight, behavior });
+    setNewMessageCount(0);
+  }, []);
+
   useEffect(() => {
-    if (messagesRef.current) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    const previousMessages = previousMessagesRef.current;
+    const previousIds = new Set(previousMessages.map((message) => message.id).filter(Boolean));
+    const addedMessages = messages.filter((message) => message.id && !previousIds.has(message.id));
+
+    if (!hasInitialScrollRef.current && messages.length > 0) {
+      requestAnimationFrame(() => scrollToBottom('auto'));
+      hasInitialScrollRef.current = true;
+      previousMessagesRef.current = messages;
+      return;
     }
-  }, [messages]);
+
+    if (addedMessages.some((message) => message.sender === currentUserId)) {
+      requestAnimationFrame(() => scrollToBottom('smooth'));
+    } else {
+      const incomingCount = addedMessages.filter((message) => message.sender !== currentUserId).length;
+      if (incomingCount > 0) {
+        setNewMessageCount((count) => count + incomingCount);
+      }
+    }
+
+    previousMessagesRef.current = messages;
+  }, [messages, currentUserId, scrollToBottom]);
+
+  useEffect(() => {
+    const messagePanel = messagesRef.current;
+    if (!messagePanel) return undefined;
+
+    const handleScroll = () => {
+      if (isNearBottom()) {
+        setNewMessageCount(0);
+      }
+    };
+
+    messagePanel.addEventListener('scroll', handleScroll, { passive: true });
+    return () => messagePanel.removeEventListener('scroll', handleScroll);
+  }, [isNearBottom]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return undefined;
+
+    const keepFocusedInputVisible = () => {
+      if (document.activeElement === inputRef.current && isNearBottom()) {
+        requestAnimationFrame(() => scrollToBottom('auto'));
+      }
+    };
+
+    viewport.addEventListener('resize', keepFocusedInputVisible);
+    viewport.addEventListener('scroll', keepFocusedInputVisible);
+
+    return () => {
+      viewport.removeEventListener('resize', keepFocusedInputVisible);
+      viewport.removeEventListener('scroll', keepFocusedInputVisible);
+    };
+  }, [isNearBottom, scrollToBottom]);
+
+  useEffect(() => {
+    const messagePanel = messagesRef.current;
+    if (!messagePanel || !onMessageRead || !currentUserId) return undefined;
+
+    readObserverRef.current?.disconnect();
+    readObserverRef.current = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.6) return;
+
+        const messageId = entry.target.getAttribute('data-message-id');
+        if (!messageId || readQueuedRef.current.has(messageId)) return;
+
+        readQueuedRef.current.add(messageId);
+        onMessageRead(messageId);
+      });
+    }, {
+      root: messagePanel,
+      threshold: 0.6,
+    });
+
+    const unreadIncomingMessages = messages
+      .filter((message) => (
+        message.id
+        && message.sender !== currentUserId
+        && !message.readBy?.[currentUserId]
+      ));
+
+    unreadIncomingMessages.forEach((message) => {
+      const messageElement = messagePanel.querySelector(`[data-message-id="${message.id}"]`);
+      if (messageElement) {
+        readObserverRef.current.observe(messageElement);
+      }
+    });
+
+    return () => {
+      readObserverRef.current?.disconnect();
+    };
+  }, [messages, currentUserId, onMessageRead]);
 
   useEffect(() => {
     const closeContextMenu = () => setContextMenu(null);
     document.addEventListener('click', closeContextMenu);
     return () => document.removeEventListener('click', closeContextMenu);
+  }, []);
+
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return undefined;
+
+    const updateComposerHeight = () => {
+      setComposerHeight(composer.offsetHeight);
+    };
+
+    updateComposerHeight();
+
+    if (!window.ResizeObserver) {
+      window.addEventListener('resize', updateComposerHeight);
+      return () => window.removeEventListener('resize', updateComposerHeight);
+    }
+
+    const observer = new ResizeObserver(updateComposerHeight);
+    observer.observe(composer);
+
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => () => {
@@ -79,6 +209,18 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     replyTo: typeof msg === 'string' ? null : msg.replyTo,
   });
 
+  const getOwnMessageStatus = (msg) => {
+    if (typeof msg === 'string') return 'sent';
+
+    const hasBeenRead = Object.keys(msg.readBy || {}).some((userId) => userId !== currentUserId);
+    if (hasBeenRead) return 'read';
+
+    const hasBeenDelivered = Object.keys(msg.deliveredTo || {}).some((userId) => userId !== currentUserId);
+    if (hasBeenDelivered) return 'delivered';
+
+    return 'sent';
+  };
+
   const selectReply = (msg) => {
     const { text, sender } = getMessageDetails(msg);
     setReplyingTo({ text, sender });
@@ -120,7 +262,11 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
           const isOwnMessage = senderId === currentUserId || (senderId === 'local-user' && !currentUserId);
 
           return (
-            <div key={msg.id || idx} className={`message-row ${isOwnMessage ? 'own-message-row' : 'other-message-row'}`}>
+            <div
+              key={msg.id || idx}
+              className={`message-row ${isOwnMessage ? 'own-message-row' : 'other-message-row'}`}
+              data-message-id={msg.id || ''}
+            >
               <div
                 className={`message ${isOwnMessage ? 'own-message' : 'other-message'}`}
                 onContextMenu={(event) => {
@@ -136,7 +282,18 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
                     <span>{replyTo.text}</span>
                   </div>
                 )}
-                <div>{messageText}</div>
+                <div className="message-content">
+                  <span>{messageText}</span>
+                  {isOwnMessage && (
+                    <span
+                      className={`message-status message-status-${getOwnMessageStatus(msg)}`}
+                      aria-label={`Message ${getOwnMessageStatus(msg)}`}
+                      title={`Message ${getOwnMessageStatus(msg)}`}
+                    >
+                      {getOwnMessageStatus(msg) === 'sent' ? '\u2713' : '\u2713\u2713'}
+                    </span>
+                  )}
+                </div>
               </div>
               {contextMenu?.index === idx && (
                 <button
@@ -150,16 +307,29 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
             </div>
           );
         })}
-      </div>
-
-      <div className="chat-composer">
         {typingUsers.length > 0 && (
-          <div className="typing-indicator" aria-label="Typing">
-            <span />
-            <span />
-            <span />
+          <div className="message-row other-message-row typing-message-row">
+            <div className="typing-indicator" aria-label="Typing">
+              <span />
+              <span />
+              <span />
+            </div>
           </div>
         )}
+      </div>
+
+      {newMessageCount > 0 && (
+        <button
+          className="new-message-indicator"
+          type="button"
+          style={{ bottom: `calc(${composerHeight + 8}px + env(safe-area-inset-bottom))` }}
+          onClick={() => scrollToBottom('smooth')}
+        >
+          {newMessageCount} new {newMessageCount === 1 ? 'message' : 'messages'}
+        </button>
+      )}
+
+      <div className="chat-composer" ref={composerRef}>
         {replyingTo && (
           <div className="replying-banner">
             <div>

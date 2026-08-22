@@ -1,6 +1,7 @@
 .chat-container {
   flex: 1;
   min-height: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -36,6 +37,30 @@
   min-width: 60px;
   max-width: 80%;
   overflow-wrap: anywhere;
+}
+
+.message-content {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.message-content span:first-child {
+  min-width: 0;
+}
+
+.message-status {
+  flex: 0 0 auto;
+  margin-bottom: -2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.message-status-read {
+  color: #42c7ff;
 }
 
 .message-row {
@@ -91,6 +116,28 @@
   backdrop-filter: blur(10px);
 }
 
+.new-message-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  z-index: 120;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--brand-violet), var(--brand-blue));
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(23, 20, 88, 0.24);
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.new-message-indicator:hover {
+  background: linear-gradient(135deg, var(--brand-violet), var(--brand-blue));
+}
+
 .replying-banner {
   display: flex;
   align-items: center;
@@ -107,12 +154,16 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin: 5px max(10px, calc((100vw - 760px) / 2)) 0;
+  margin: 4px 0;
   padding: 8px 12px;
   border-radius: 15px;
   border-bottom-left-radius: 5px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 2px 7px rgba(42, 35, 115, 0.08);
+}
+
+.typing-message-row {
+  margin-top: 2px;
 }
 
 .typing-indicator span {
@@ -203,6 +254,14 @@ body.dark .own-message {
   color: #fff;
 }
 
+body.dark .message-status {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+body.dark .message-status-read {
+  color: #55d5ff;
+}
+
 .chat-input {
   display: flex;
   margin-top: 0;
@@ -243,10 +302,6 @@ body.dark .chat-input input {
 }
 
 @media (max-width: 480px) {
-  .typing-indicator {
-    margin: 5px 8px 0;
-  }
-
   .chat-input {
     padding: 6px 5px calc(14px + env(safe-area-inset-bottom));
   }
