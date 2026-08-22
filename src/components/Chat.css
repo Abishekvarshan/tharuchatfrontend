@@ -160,6 +160,10 @@ body.dark .own-message {
   background: transparent;
 }
 
+.chat-composer:focus-within .chat-input {
+  padding-bottom: 6px;
+}
+
 .chat-input input {
   flex: 1;
   min-width: 0;
@@ -190,6 +194,10 @@ body.dark .chat-input input {
 @media (max-width: 480px) {
   .chat-input {
     padding: 6px 5px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .chat-composer:focus-within .chat-input {
+    padding-bottom: 6px;
   }
 
   .chat-input input {
