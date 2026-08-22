@@ -8,6 +8,7 @@
 
 .auth-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   background: var(--bg-color);
@@ -46,6 +47,9 @@ body.dark {
 
 .app-container {
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-color);
   color: var(--text-color);
   font-family: "Segoe UI", sans-serif;
@@ -54,6 +58,7 @@ body.dark {
 }
 
 .app-header {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -62,8 +67,7 @@ body.dark {
   border-bottom: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 4px 18px rgba(54, 37, 148, 0.25);
   color: #fff;
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 100;
 }
 
