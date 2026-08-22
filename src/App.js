@@ -27,6 +27,31 @@ function App() {
   const roomID = getDailyRoomID();
 
   useEffect(() => {
+    const updateViewportSize = () => {
+      const viewport = window.visualViewport;
+      const viewportHeight = viewport?.height || window.innerHeight;
+      const viewportTop = viewport?.offsetTop || 0;
+
+      document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
+      document.documentElement.style.setProperty('--app-top', `${viewportTop}px`);
+      window.scrollTo(0, 0);
+    };
+
+    updateViewportSize();
+    window.addEventListener('resize', updateViewportSize);
+    window.visualViewport?.addEventListener('resize', updateViewportSize);
+    window.visualViewport?.addEventListener('scroll', updateViewportSize);
+
+    return () => {
+      window.removeEventListener('resize', updateViewportSize);
+      window.visualViewport?.removeEventListener('resize', updateViewportSize);
+      window.visualViewport?.removeEventListener('scroll', updateViewportSize);
+      document.documentElement.style.removeProperty('--app-height');
+      document.documentElement.style.removeProperty('--app-top');
+    };
+  }, []);
+
+  useEffect(() => {
     let unsubscribeMessages = () => {};
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
