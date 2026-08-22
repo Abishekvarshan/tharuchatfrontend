@@ -1,6 +1,14 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { ref as databaseRef, onDisconnect, onValue, remove, set, update } from 'firebase/database';
+import {
+  ref as databaseRef,
+  onDisconnect,
+  onValue,
+  remove,
+  serverTimestamp as databaseServerTimestamp,
+  set,
+  update,
+} from 'firebase/database';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { getDailyRoomID } from './utils';
 import Chat from './components/Chat';
@@ -119,16 +127,16 @@ function App() {
     const typingRef = databaseRef(realtimeDb, `typing/${roomID}`);
     const unsubscribe = onValue(typingRef, (snapshot) => {
       const typing = snapshot.val() || {};
-      const now = Date.now();
       const nextTypingUsers = Object.entries(typing)
         .filter(([userId, status]) => (
           userId !== currentUserId
           && status?.isTyping
-          && now - (status.updatedAt || 0) < 5000
         ))
         .map(([, status]) => status.name || 'Someone');
 
       setTypingUsers(nextTypingUsers);
+    }, (error) => {
+      console.error('Typing status could not be read:', error);
     });
 
     return () => unsubscribe();
@@ -138,10 +146,14 @@ function App() {
     if (!currentUserId) return undefined;
 
     const currentTypingRef = databaseRef(realtimeDb, `typing/${roomID}/${currentUserId}`);
-    onDisconnect(currentTypingRef).remove();
+    onDisconnect(currentTypingRef).remove().catch((error) => {
+      console.error('Typing disconnect cleanup could not be registered:', error);
+    });
 
     return () => {
-      remove(currentTypingRef);
+      remove(currentTypingRef).catch((error) => {
+        console.error('Typing cleanup failed:', error);
+      });
     };
   }, [currentUserId, roomID]);
 
@@ -198,16 +210,20 @@ function App() {
 
     const currentTypingRef = databaseRef(realtimeDb, `typing/${roomID}/${currentUserId}`);
 
-    if (!isTyping) {
-      await remove(currentTypingRef);
-      return;
-    }
+    try {
+      if (!isTyping) {
+        await remove(currentTypingRef);
+        return;
+      }
 
-    await set(currentTypingRef, {
-      isTyping: true,
-      name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Someone',
-      updatedAt: Date.now(),
-    });
+      await set(currentTypingRef, {
+        isTyping: true,
+        name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Someone',
+        updatedAt: databaseServerTimestamp(),
+      });
+    } catch (error) {
+      console.error('Typing status could not be saved:', error);
+    }
   }, [currentUser, currentUserId, roomID]);
 
   const handleCloseVideoOverlay = () => {

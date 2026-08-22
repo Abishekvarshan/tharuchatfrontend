@@ -86,6 +86,11 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  const cancelReply = () => {
+    setReplyingTo(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   const handleTouchStart = (event, index) => {
     const touch = event.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, index };
@@ -159,7 +164,14 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
               <strong>Replying to</strong>
               <span>{replyingTo.text}</span>
             </div>
-            <button aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>&times;</button>
+            <button
+              aria-label="Cancel reply"
+              onMouseDown={(event) => event.preventDefault()}
+              onTouchStart={(event) => event.preventDefault()}
+              onClick={cancelReply}
+            >
+              &times;
+            </button>
           </div>
         )}
         <form className="chat-input" onSubmit={(event) => { event.preventDefault(); handleSend(); }}>
