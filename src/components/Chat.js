@@ -154,8 +154,10 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
 
       <div className="chat-composer">
         {typingUsers.length > 0 && (
-          <div className="typing-indicator">
-            {typingUsers.length === 1 ? `${typingUsers[0]} is typing...` : 'Someone is typing...'}
+          <div className="typing-indicator" aria-label="Typing">
+            <span />
+            <span />
+            <span />
           </div>
         )}
         {replyingTo && (
