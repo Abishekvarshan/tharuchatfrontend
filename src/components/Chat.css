@@ -30,11 +30,11 @@
 
 .message {
   position: relative;
-  padding: 9px 13px;
+  padding: 7px 10px;
   margin: 4px 0;
   border-radius: 15px;
   box-shadow: 0 2px 7px rgba(42, 35, 115, 0.08);
-  min-width: 60px;
+  width: fit-content;
   max-width: 80%;
   overflow-wrap: anywhere;
 }
@@ -42,6 +42,7 @@
 .message-content {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   padding-right: 4px;
 }
 
@@ -50,9 +51,6 @@
 }
 
 .message-status {
-  position: absolute;
-  right: 10px;
-  bottom: 7px;
   display: inline-flex;
   align-items: center;
   font-size: 0.78rem;
@@ -233,8 +231,6 @@
   color: white;
   border-bottom-right-radius: 5px;
   align-self: flex-end;
-  padding-right: 34px;
-  padding-bottom: 14px;
 }
 
 body.dark .chat-container {
@@ -313,7 +309,6 @@ body.dark .chat-input input {
   color: white;
   cursor: pointer;
 }
-
 
 .message-meta {
   display: inline-flex;
