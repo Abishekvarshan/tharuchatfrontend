@@ -52,7 +52,6 @@ function VideoCallOverlay({
   const [isFullscreen, setIsFullscreen] = useState(initialFullscreen);
   const [callId, setCallId] = useState(null);
   const [callStatus, setCallStatus] = useState('idle');
-  const [connectionStatus, setConnectionStatus] = useState('Not connected');
   const [permissionError, setPermissionError] = useState('');
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
@@ -102,7 +101,6 @@ function VideoCallOverlay({
     pendingCandidatesRef.current = [];
     setCallId(null);
     setCallStatus('idle');
-    setConnectionStatus('Not connected');
     setPermissionError('');
     setAudioEnabled(true);
     setVideoEnabled(true);
@@ -178,7 +176,6 @@ function VideoCallOverlay({
     };
 
     pc.onconnectionstatechange = () => {
-      setConnectionStatus(pc.connectionState);
       if (pc.connectionState === 'connected') {
         setCallStatus('connected');
         update(databaseRef(realtimeDb, `calls/${id}`), { status: 'connected', connectedAt: Date.now() });
@@ -186,7 +183,9 @@ function VideoCallOverlay({
     };
 
     pc.oniceconnectionstatechange = () => {
-      setConnectionStatus(pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        setCallStatus('connected');
+      }
     };
 
     return pc;
@@ -221,8 +220,6 @@ function VideoCallOverlay({
     if (!currentUser || !activeCall?.receiverEmail) return;
 
     setCallStatus('calling');
-    setConnectionStatus('Preparing camera');
-
     const newCallRef = push(databaseRef(realtimeDb, 'calls'));
     const newCallId = newCallRef.key;
     setCallId(newCallId);
@@ -259,7 +256,6 @@ function VideoCallOverlay({
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
       remoteDescriptionSetRef.current = true;
       await flushPendingCandidates();
-      setConnectionStatus('Connecting');
     });
 
     attachCleanup(unsubscribeAnswer);
@@ -270,8 +266,6 @@ function VideoCallOverlay({
 
     setCallId(activeCall.callId);
     setCallStatus('connecting');
-    setConnectionStatus('Preparing camera');
-
     const callRef = databaseRef(realtimeDb, `calls/${activeCall.callId}`);
     const callSnapshot = await get(callRef);
     const callData = callSnapshot.val();
