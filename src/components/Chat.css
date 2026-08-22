@@ -1,7 +1,9 @@
 .chat-container {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background-color: var(--bg-color);
   background-image: url('./background.png');
   background-position: center;
@@ -15,10 +17,15 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px max(10px, calc((100vw - 760px) / 2));
+  overscroll-behavior: contain;
+  padding: 12px max(10px, calc((100vw - 760px) / 2)) 14px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+}
+
+.messages::before {
+  content: '';
+  margin-top: auto;
 }
 
 .message {
@@ -27,6 +34,7 @@
   margin: 4px 0;
   border-radius: 15px;
   box-shadow: 0 2px 7px rgba(42, 35, 115, 0.08);
+  min-width: 60px;
   max-width: 80%;
   overflow-wrap: anywhere;
 }
@@ -75,6 +83,15 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+.chat-composer {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.82);
+  border-top: 1px solid var(--line-color);
+  backdrop-filter: blur(10px);
+}
+
 .replying-banner {
   display: flex;
   align-items: center;
@@ -119,6 +136,10 @@ body.dark .chat-container {
 }
 
 body.dark .chat-input {
+  background: transparent;
+}
+
+body.dark .chat-composer {
   background: rgba(0, 0, 0, 0.6);
 }
 
@@ -134,12 +155,10 @@ body.dark .own-message {
 
 .chat-input {
   display: flex;
-  margin-top: 5px;
+  margin-top: 0;
   min-width: 0;
-  padding: 8px max(10px, calc((100vw - 760px) / 2)) env(safe-area-inset-bottom);
-  background: rgba(255, 255, 255, 0.82);
-  border-top: 1px solid var(--line-color);
-  backdrop-filter: blur(10px);
+  padding: 6px max(10px, calc((100vw - 760px) / 2)) calc(14px + env(safe-area-inset-bottom));
+  background: transparent;
 }
 
 .chat-input input {
@@ -171,7 +190,7 @@ body.dark .chat-input input {
 
 @media (max-width: 480px) {
   .chat-input {
-    padding: 5px 5px env(safe-area-inset-bottom);
+    padding: 6px 5px calc(14px + env(safe-area-inset-bottom));
   }
 
   .chat-input input {

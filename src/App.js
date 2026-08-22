@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { ref as databaseRef, onValue, remove, update } from 'firebase/database';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { getDailyRoomID } from './utils';
 import Chat from './components/Chat';
 import VideoCallOverlay from './components/VideoCallOverlay';
-import { auth, db } from './firebase';
+import { auth, db, realtimeDb } from './firebase';
 import './App.css';
 
 const ALLOWED_EMAILS = new Set([
@@ -14,12 +15,14 @@ const ALLOWED_EMAILS = new Set([
 
 function App() {
   const [messages, setMessages] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
   const [darkMode, setDarkMode] = useState(false);
   const [showVideoOverlay, setShowVideoOverlay] = useState(false);
-  const [isReceiver, setIsReceiver] = useState(false);
+  const [activeCall, setActiveCall] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
   const firebaseReadyRef = useRef(null);
   const roomID = getDailyRoomID();
 
@@ -29,6 +32,7 @@ function App() {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setAuthLoading(false);
       const isAllowedUser = user?.email && ALLOWED_EMAILS.has(user.email.toLowerCase());
+      setCurrentUser(isAllowedUser ? user : null);
       setCurrentUserId(isAllowedUser ? user.uid : null);
 
       if (user && isAllowedUser) {
@@ -53,6 +57,33 @@ function App() {
     };
   }, [roomID]);
 
+  useEffect(() => {
+    if (!currentUser?.email) {
+      setIncomingCall(null);
+      return undefined;
+    }
+
+    const callsRef = databaseRef(realtimeDb, 'calls');
+    const unsubscribe = onValue(callsRef, (snapshot) => {
+      const calls = snapshot.val() || {};
+      const nextIncomingCall = Object.entries(calls).find(([, call]) => (
+        call.status === 'ringing'
+        && call.receiverEmail === currentUser.email.toLowerCase()
+        && call.callerId !== currentUser.uid
+      ));
+
+      if (!nextIncomingCall) {
+        setIncomingCall(null);
+        return;
+      }
+
+      const [callId, call] = nextIncomingCall;
+      setIncomingCall({ id: callId, ...call });
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   const handleGoogleSignIn = async () => {
     setAuthError('');
     try {
@@ -76,8 +107,14 @@ function App() {
   };
 
   const handleVideoCallClick = () => {
+    if (!currentUser) return;
+    const receiverEmail = [...ALLOWED_EMAILS].find((email) => email !== currentUser.email.toLowerCase());
+
+    setActiveCall({
+      mode: 'caller',
+      receiverEmail,
+    });
     setShowVideoOverlay(true);
-    setIsReceiver(false); // Set as caller
   };
 
   const addMessage = async (message) => {
@@ -97,7 +134,30 @@ function App() {
 
   const handleCloseVideoOverlay = () => {
     setShowVideoOverlay(false);
-    setIsReceiver(false);
+    setActiveCall(null);
+  };
+
+  const handleAcceptCall = () => {
+    if (!incomingCall) return;
+
+    setActiveCall({
+      mode: 'receiver',
+      callId: incomingCall.id,
+      callerId: incomingCall.callerId,
+      callerName: incomingCall.callerName,
+      callerEmail: incomingCall.callerEmail,
+    });
+    setIncomingCall(null);
+    setShowVideoOverlay(true);
+  };
+
+  const handleRejectCall = async () => {
+    if (!incomingCall) return;
+
+    const callRef = databaseRef(realtimeDb, `calls/${incomingCall.id}`);
+    await update(callRef, { status: 'rejected', endedAt: Date.now() });
+    await remove(callRef);
+    setIncomingCall(null);
   };
 
   if (authLoading) {
@@ -127,18 +187,39 @@ function App() {
           <h2>WishUs</h2>
         </div>
         <div className="header-buttons">
-          <button onClick={handleVideoCallClick}>📹</button>
-          <button onClick={toggleDarkMode}>
-            {darkMode ? '🌙' : '☀️'}
-            </button>
+          <button className="video-call-button" onClick={handleVideoCallClick} aria-label="Start video call" title="Start video call">
+            <span className="video-call-icon" aria-hidden="true" />
+          </button>
+          <button
+            className={`theme-toggle ${darkMode ? 'is-dark' : 'is-light'}`}
+            onClick={toggleDarkMode}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <span className="theme-toggle-orbit" aria-hidden="true">
+              <span className="theme-toggle-icon" />
+            </span>
+          </button>
         </div>
       </header>
 
       <Chat messages={messages} currentUserId={currentUserId} addMessage={addMessage} />
 
+      {incomingCall && !showVideoOverlay && (
+        <div className="incoming-call-card">
+          <div>
+            <strong>Incoming video call</strong>
+            <span>{incomingCall.callerName || incomingCall.callerEmail || 'WishUs user'}</span>
+          </div>
+          <button className="accept-call-button" onClick={handleAcceptCall}>Accept</button>
+          <button className="reject-call-button" onClick={handleRejectCall}>Reject</button>
+        </div>
+      )}
+
       <VideoCallOverlay
+        activeCall={activeCall}
+        currentUser={currentUser}
         onClose={handleCloseVideoOverlay}
-        isReceiver={isReceiver}
         isVisible={showVideoOverlay}
       />
     </div>

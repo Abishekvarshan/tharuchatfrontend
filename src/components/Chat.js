@@ -5,14 +5,14 @@ function Chat({ messages, currentUserId, addMessage }) {
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
-  const messagesEndRef = useRef(null);
+  const messagesRef = useRef(null);
   const touchStartRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Scroll to bottom when new message arrives
+  // Keep scrolling inside the message panel, not the whole chat page.
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -55,6 +55,7 @@ function Chat({ messages, currentUserId, addMessage }) {
     const { text, sender } = getMessageDetails(msg);
     setReplyingTo({ text, sender });
     setContextMenu(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleTouchStart = (event, index) => {
@@ -79,7 +80,7 @@ function Chat({ messages, currentUserId, addMessage }) {
 
   return (
     <div className="chat-container">
-      <div className="messages">
+      <div className="messages" ref={messagesRef}>
         {messages.map((msg, idx) => {
           // Handle both old string format and new object format
           const { text: messageText, sender: senderId, replyTo } = getMessageDetails(msg);
@@ -116,28 +117,30 @@ function Chat({ messages, currentUserId, addMessage }) {
             </div>
           );
         })}
-        <div ref={messagesEndRef} />
       </div>
-      {replyingTo && (
-        <div className="replying-banner">
-          <div>
-            <strong>Replying to</strong>
-            <span>{replyingTo.text}</span>
+
+      <div className="chat-composer">
+        {replyingTo && (
+          <div className="replying-banner">
+            <div>
+              <strong>Replying to</strong>
+              <span>{replyingTo.text}</span>
+            </div>
+            <button aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>&times;</button>
           </div>
-          <button aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>×</button>
-        </div>
-      )}
-      <form className="chat-input" onSubmit={(event) => { event.preventDefault(); handleSend(); }}>
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="Type a message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-        />
-        <button type="submit" onMouseDown={(event) => event.preventDefault()}>Send</button>
-      </form>
+        )}
+        <form className="chat-input" onSubmit={(event) => { event.preventDefault(); handleSend(); }}>
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Type a message..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+          />
+          <button type="submit" onMouseDown={(event) => event.preventDefault()}>Send</button>
+        </form>
+      </div>
     </div>
   );
 }
