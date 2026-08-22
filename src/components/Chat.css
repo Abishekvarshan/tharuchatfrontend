@@ -40,9 +40,7 @@
 }
 
 .message-content {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
+  display: block;
 }
 
 .message-content span:first-child {
@@ -50,8 +48,9 @@
 }
 
 .message-status {
-  flex: 0 0 auto;
-  margin-bottom: -2px;
+  position: absolute;
+  right: 10px;
+  bottom: 7px;
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1;
@@ -222,6 +221,8 @@
   color: white;
   border-bottom-right-radius: 5px;
   align-self: flex-end;
+  padding-right: 34px;
+  padding-bottom: 14px;
 }
 
 body.dark .chat-container {
