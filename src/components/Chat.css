@@ -41,9 +41,10 @@
 
 .message-content {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: flex-end;
-  padding-right: 4px;
+  column-gap: 6px;
+  row-gap: 2px;
 }
 
 .message-content span:first-child {
@@ -314,7 +315,7 @@ body.dark .chat-input input {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  align-self: flex-end;
+  margin-left: auto;
   margin-top: 3px;
   font-size: 0.7rem;
   font-weight: 400;
