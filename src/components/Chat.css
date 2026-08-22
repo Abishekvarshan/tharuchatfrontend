@@ -40,7 +40,8 @@
 }
 
 .message-content {
-  display: block;
+  display: flex;
+  flex-direction: column;
   padding-right: 4px;
 }
 
@@ -318,7 +319,8 @@ body.dark .chat-input input {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: 8px;
+  align-self: flex-end;
+  margin-top: 3px;
   font-size: 0.7rem;
   font-weight: 400;
   line-height: 1;
