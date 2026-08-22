@@ -102,6 +102,13 @@
   font-size: 0.85rem;
 }
 
+.typing-indicator {
+  padding: 5px max(10px, calc((100vw - 760px) / 2)) 0;
+  color: rgba(32, 32, 68, 0.72);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .replying-banner div {
   display: flex;
   flex-direction: column;
@@ -140,6 +147,10 @@ body.dark .chat-input {
 
 body.dark .chat-composer {
   background: rgba(0, 0, 0, 0.6);
+}
+
+body.dark .typing-indicator {
+  color: rgba(245, 245, 255, 0.76);
 }
 
 body.dark .other-message {
@@ -192,6 +203,10 @@ body.dark .chat-input input {
 }
 
 @media (max-width: 480px) {
+  .typing-indicator {
+    padding: 5px 8px 0;
+  }
+
   .chat-input {
     padding: 6px 5px calc(14px + env(safe-area-inset-bottom));
   }

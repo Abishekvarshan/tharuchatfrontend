@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { ref as databaseRef, onValue, remove, update } from 'firebase/database';
+import { ref as databaseRef, onDisconnect, onValue, remove, set, update } from 'firebase/database';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { getDailyRoomID } from './utils';
 import Chat from './components/Chat';
@@ -23,6 +23,7 @@ function App() {
   const [showVideoOverlay, setShowVideoOverlay] = useState(false);
   const [activeCall, setActiveCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
+  const [typingUsers, setTypingUsers] = useState([]);
   const firebaseReadyRef = useRef(null);
   const roomID = getDailyRoomID();
 
@@ -109,6 +110,41 @@ function App() {
     return () => unsubscribe();
   }, [currentUser]);
 
+  useEffect(() => {
+    if (!currentUserId) {
+      setTypingUsers([]);
+      return undefined;
+    }
+
+    const typingRef = databaseRef(realtimeDb, `typing/${roomID}`);
+    const unsubscribe = onValue(typingRef, (snapshot) => {
+      const typing = snapshot.val() || {};
+      const now = Date.now();
+      const nextTypingUsers = Object.entries(typing)
+        .filter(([userId, status]) => (
+          userId !== currentUserId
+          && status?.isTyping
+          && now - (status.updatedAt || 0) < 5000
+        ))
+        .map(([, status]) => status.name || 'Someone');
+
+      setTypingUsers(nextTypingUsers);
+    });
+
+    return () => unsubscribe();
+  }, [currentUserId, roomID]);
+
+  useEffect(() => {
+    if (!currentUserId) return undefined;
+
+    const currentTypingRef = databaseRef(realtimeDb, `typing/${roomID}/${currentUserId}`);
+    onDisconnect(currentTypingRef).remove();
+
+    return () => {
+      remove(currentTypingRef);
+    };
+  }, [currentUserId, roomID]);
+
   const handleGoogleSignIn = async () => {
     setAuthError('');
     try {
@@ -156,6 +192,23 @@ function App() {
       setMessages((prev) => [...prev, message]);
     }
   };
+
+  const handleTypingChange = useCallback(async (isTyping) => {
+    if (!currentUserId || !currentUser) return;
+
+    const currentTypingRef = databaseRef(realtimeDb, `typing/${roomID}/${currentUserId}`);
+
+    if (!isTyping) {
+      await remove(currentTypingRef);
+      return;
+    }
+
+    await set(currentTypingRef, {
+      isTyping: true,
+      name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Someone',
+      updatedAt: Date.now(),
+    });
+  }, [currentUser, currentUserId, roomID]);
 
   const handleCloseVideoOverlay = () => {
     setShowVideoOverlay(false);
@@ -228,7 +281,13 @@ function App() {
         </div>
       </header>
 
-      <Chat messages={messages} currentUserId={currentUserId} addMessage={addMessage} />
+      <Chat
+        messages={messages}
+        currentUserId={currentUserId}
+        addMessage={addMessage}
+        typingUsers={typingUsers}
+        onTypingChange={handleTypingChange}
+      />
 
       {incomingCall && !showVideoOverlay && (
         <div className="incoming-call-card">

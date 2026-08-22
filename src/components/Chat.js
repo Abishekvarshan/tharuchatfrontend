@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Chat.css'; // optional CSS for chat styling
 
-function Chat({ messages, currentUserId, addMessage }) {
+function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingChange }) {
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const messagesRef = useRef(null);
   const touchStartRef = useRef(null);
   const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   // Keep scrolling inside the message panel, not the whole chat page.
   useEffect(() => {
@@ -21,6 +22,18 @@ function Chat({ messages, currentUserId, addMessage }) {
     document.addEventListener('click', closeContextMenu);
     return () => document.removeEventListener('click', closeContextMenu);
   }, []);
+
+  useEffect(() => () => {
+    clearTimeout(typingTimeoutRef.current);
+    onTypingChange?.(false);
+  }, [onTypingChange]);
+
+  const stopTypingSoon = () => {
+    clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      onTypingChange?.(false);
+    }, 1500);
+  };
 
   const handleSend = () => {
     const messageText = input.trim();
@@ -38,11 +51,26 @@ function Chat({ messages, currentUserId, addMessage }) {
 
     setInput('');
     setReplyingTo(null);
+    clearTimeout(typingTimeoutRef.current);
+    onTypingChange?.(false);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') handleSend();
+  };
+
+  const handleInputChange = (e) => {
+    const nextInput = e.target.value;
+    setInput(nextInput);
+
+    if (nextInput.trim()) {
+      onTypingChange?.(true);
+      stopTypingSoon();
+    } else {
+      clearTimeout(typingTimeoutRef.current);
+      onTypingChange?.(false);
+    }
   };
 
   const getMessageDetails = (msg) => ({
@@ -120,6 +148,11 @@ function Chat({ messages, currentUserId, addMessage }) {
       </div>
 
       <div className="chat-composer">
+        {typingUsers.length > 0 && (
+          <div className="typing-indicator">
+            {typingUsers.length === 1 ? `${typingUsers[0]} is typing...` : 'Someone is typing...'}
+          </div>
+        )}
         {replyingTo && (
           <div className="replying-banner">
             <div>
@@ -135,7 +168,7 @@ function Chat({ messages, currentUserId, addMessage }) {
             type="text"
             placeholder="Type a message..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
           />
           <button type="submit" onMouseDown={(event) => event.preventDefault()}>Send</button>
