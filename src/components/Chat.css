@@ -2,59 +2,155 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--bg-color);
+  background-color: var(--bg-color);
+  background-image: url('./background.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
   color: var(--text-color);
 }
 
 .messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 5px;
+  padding: 12px max(10px, calc((100vw - 760px) / 2));
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
 }
 
 .message {
-  padding: 6px 10px;
+  position: relative;
+  padding: 9px 13px;
   margin: 4px 0;
-  border-radius: 12px;
+  border-radius: 15px;
+  box-shadow: 0 2px 7px rgba(42, 35, 115, 0.08);
   max-width: 80%;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.message-row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.own-message-row {
+  align-items: flex-end;
+}
+
+.other-message-row {
+  align-items: flex-start;
+}
+
+.reply-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: -2px -4px 5px;
+  padding: 4px 7px;
+  border-left: 3px solid currentColor;
+  opacity: 0.8;
+  font-size: 0.8rem;
+}
+
+.reply-preview span,
+.replying-banner span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reply-action {
+  position: fixed;
+  z-index: 10;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--line-color);
+  border-radius: 6px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.replying-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--brand-violet);
+  background: rgba(113, 56, 220, 0.1);
+  font-size: 0.85rem;
+}
+
+.replying-banner div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.replying-banner button {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 1.2rem;
 }
 
 .other-message {
-  background: #e1ffc7;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom-left-radius: 5px;
   align-self: flex-start;
 }
 
 .own-message {
-  background: #007bff;
+  background: linear-gradient(135deg, var(--brand-violet), var(--brand-blue));
   color: white;
+  border-bottom-right-radius: 5px;
   align-self: flex-end;
 }
 
+body.dark .chat-container {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('./background.png');
+}
+
+body.dark .chat-input {
+  background: rgba(0, 0, 0, 0.6);
+}
+
 body.dark .other-message {
-  background: #333;
+  background: #25294b;
   color: #fff;
 }
 
 body.dark .own-message {
-  background: #0056b3;
+  background: #4e54c8;
   color: #fff;
 }
 
 .chat-input {
   display: flex;
   margin-top: 5px;
+  min-width: 0;
+  padding: 8px max(10px, calc((100vw - 760px) / 2)) env(safe-area-inset-bottom);
+  background: rgba(255, 255, 255, 0.82);
+  border-top: 1px solid var(--line-color);
+  backdrop-filter: blur(10px);
 }
 
 .chat-input input {
   flex: 1;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
+  min-width: 0;
+  padding: 10px 13px;
+  border-radius: 18px;
+  border: 1px solid var(--line-color);
   background: var(--bg-color);
   color: var(--text-color);
+  font-size: 16px;
 }
 
 body.dark .chat-input input {
@@ -62,13 +158,29 @@ body.dark .chat-input input {
 }
 
 .chat-input button {
+  flex: 0 0 auto;
   margin-left: 5px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 18px;
   border: none;
-  background: #4caf50;
+  background: linear-gradient(135deg, var(--brand-violet), var(--brand-blue));
+  box-shadow: 0 3px 10px rgba(73, 67, 210, 0.3);
   color: white;
   cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .chat-input {
+    padding: 5px 5px env(safe-area-inset-bottom);
+  }
+
+  .chat-input input {
+    padding: 10px 8px;
+  }
+
+  .chat-input button {
+    padding: 10px 9px;
+  }
 }
 
 .chat-input button:hover {

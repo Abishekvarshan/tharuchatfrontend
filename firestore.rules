@@ -1,0 +1,12 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /rooms/{roomId}/messages/{messageId} {
+      allow read, create: if request.auth != null
+        && (request.auth.token.email == 'varsityabi@gmail.com'
+          || request.auth.token.email == 'shamilyrathnakumar@gmail.com');
+      allow update, delete: if false;
+    }
+  }
+}
