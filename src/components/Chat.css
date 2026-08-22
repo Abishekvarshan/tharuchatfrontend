@@ -41,6 +41,7 @@
 
 .message-content {
   display: block;
+  padding-right: 4px;
 }
 
 .message-content span:first-child {
@@ -310,6 +311,34 @@ body.dark .chat-input input {
   box-shadow: 0 3px 10px rgba(73, 67, 210, 0.3);
   color: white;
   cursor: pointer;
+}
+
+
+.message-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1;
+  vertical-align: bottom;
+}
+
+.own-message-meta {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.other-message-meta {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.message-time {
+  font-size: 0.7rem;
+}
+
+body.dark .other-message-meta {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 @media (max-width: 480px) {
