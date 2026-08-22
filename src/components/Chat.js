@@ -16,6 +16,7 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
   const readObserverRef = useRef(null);
   const readQueuedRef = useRef(new Set());
   const keepLatestVisibleRef = useRef(false);
+  const userNearBottomRef = useRef(true);
   const [composerHeight, setComposerHeight] = useState(64);
 
   const isNearBottom = useCallback(() => {
@@ -24,10 +25,16 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     return messagePanel.scrollHeight - messagePanel.scrollTop - messagePanel.clientHeight < 72;
   }, []);
 
+  const updateNearBottomState = useCallback(() => {
+    userNearBottomRef.current = isNearBottom();
+    return userNearBottomRef.current;
+  }, [isNearBottom]);
+
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     const messagePanel = messagesRef.current;
     if (!messagePanel) return;
     messagePanel.scrollTo({ top: messagePanel.scrollHeight, behavior });
+    userNearBottomRef.current = true;
     setNewMessageCount(0);
   }, []);
 
@@ -51,7 +58,9 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
       return;
     }
 
-    if (addedMessages.some((message) => message.sender === currentUserId)) {
+    const shouldKeepLatestVisible = keepLatestVisibleRef.current || userNearBottomRef.current;
+
+    if (addedMessages.some((message) => message.sender === currentUserId) || shouldKeepLatestVisible) {
       requestAnimationFrame(() => scrollToBottom('smooth'));
     } else {
       const incomingCount = addedMessages.filter((message) => message.sender !== currentUserId).length;
@@ -68,14 +77,14 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     if (!messagePanel) return undefined;
 
     const handleScroll = () => {
-      if (isNearBottom()) {
+      if (updateNearBottomState()) {
         setNewMessageCount(0);
       }
     };
 
     messagePanel.addEventListener('scroll', handleScroll, { passive: true });
     return () => messagePanel.removeEventListener('scroll', handleScroll);
-  }, [isNearBottom]);
+  }, [updateNearBottomState]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -216,8 +225,10 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
   };
 
   const handleInputFocus = () => {
-    keepLatestVisibleRef.current = isNearBottom() || messages.length > 0;
-    settleLatestMessages();
+    keepLatestVisibleRef.current = updateNearBottomState();
+    if (keepLatestVisibleRef.current) {
+      settleLatestMessages();
+    }
   };
 
   const handleInputBlur = () => {
@@ -229,6 +240,21 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
     sender: typeof msg === 'string' ? null : msg.sender,
     replyTo: typeof msg === 'string' ? null : msg.replyTo,
   });
+
+  const formatMessageTime = (msg) => {
+    if (typeof msg === 'string') return '';
+
+    const createdAt = msg.createdAt;
+    const date = createdAt?.toDate?.() || (createdAt ? new Date(createdAt) : new Date());
+
+    if (Number.isNaN(date.getTime())) return '';
+
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  };
 
   const getOwnMessageStatus = (msg) => {
     if (typeof msg === 'string') return 'sent';
@@ -305,13 +331,21 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
                 )}
                 <div className="message-content">
                   <span>{messageText}</span>
-                  {isOwnMessage && (
-                    <span
-                      className={`message-status message-status-${getOwnMessageStatus(msg)}`}
-                      aria-label={`Message ${getOwnMessageStatus(msg)}`}
-                      title={`Message ${getOwnMessageStatus(msg)}`}
-                    >
-                      {getOwnMessageStatus(msg) === 'sent' ? '\u2713' : '\u2713\u2713'}
+                  {formatMessageTime(msg) && (
+                    <span className={`message-meta ${isOwnMessage ? 'own-message-meta' : 'other-message-meta'}`}>
+                      <span className="message-time">{formatMessageTime(msg)}</span>
+                      {isOwnMessage && (
+                        <span
+                          className={`message-status message-status-${getOwnMessageStatus(msg)}`}
+                          aria-label={`Message ${getOwnMessageStatus(msg)}`}
+                          title={`Message ${getOwnMessageStatus(msg)}`}
+                        >
+                          <span className="status-tick">{'\u2713'}</span>
+                          {getOwnMessageStatus(msg) !== 'sent' && (
+                            <span className="status-tick status-tick-overlap">{'\u2713'}</span>
+                          )}
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>
