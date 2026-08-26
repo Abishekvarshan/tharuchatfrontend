@@ -90,10 +90,6 @@ function VideoCallOverlay({
     return null;
   };
 
-  const getCurrentUserAvatar = () => {
-    return currentUser?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.displayName || currentUser?.email || 'User')}&background=random&size=128`;
-  };
-
   const formatCallStatus = () => {
     if (isConnected) return formatDuration(durationSeconds);
     if (callStatus === 'ringing') return 'Ringing...';
