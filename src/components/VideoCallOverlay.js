@@ -272,15 +272,23 @@ function VideoCallOverlay({
     };
 
     pc.onconnectionstatechange = () => {
+      console.log('Connection state changed:', pc.connectionState); // Debug log
       if (pc.connectionState === 'connected') {
         setCallStatus('connected');
         update(databaseRef(realtimeDb, `calls/${id}`), { status: 'connected', connectedAt: Date.now() });
+      } else if (pc.connectionState === 'failed') {
+        console.error('WebRTC connection failed'); // Debug log
+        setCallStatus('error');
+        setPermissionError('Connection failed. Please try again.');
       }
     };
 
     pc.oniceconnectionstatechange = () => {
+      console.log('ICE connection state changed:', pc.iceConnectionState); // Debug log
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         setCallStatus('connected');
+      } else if (pc.iceConnectionState === 'failed') {
+        console.error('ICE connection failed'); // Debug log
       }
     };
 
@@ -291,6 +299,7 @@ function VideoCallOverlay({
     const statusRef = child(databaseRef(realtimeDb), `calls/${id}/status`);
     const unsubscribe = onValue(statusRef, (snapshot) => {
       const nextStatus = snapshot.val();
+      console.log('Call status changed from DB:', nextStatus); // Debug log
       if (!nextStatus) return;
 
       setCallStatus(nextStatus);
