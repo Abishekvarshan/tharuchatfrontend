@@ -204,7 +204,6 @@ function VideoCallOverlay({
     setVideoEnabled(true);
     setDurationSeconds(0);
     setControlsVisible(true);
-    setRemoteVideoEnabled(true);
     setLocalVideoPosition({ right: 18, bottom: 118 });
   }, [runCleanups]);
 
