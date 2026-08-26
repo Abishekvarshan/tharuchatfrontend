@@ -56,6 +56,9 @@ function VideoCallOverlay({
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [durationSeconds, setDurationSeconds] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
+  const [localVideoPosition, setLocalVideoPosition] = useState({ right: 18, bottom: 118 });
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -65,6 +68,8 @@ function VideoCallOverlay({
   const startedRef = useRef(false);
   const remoteDescriptionSetRef = useRef(false);
   const pendingCandidatesRef = useRef([]);
+  const controlsTimeoutRef = useRef(null);
+  const localVideoDragRef = useRef({ isDragging: false, startX: 0, startY: 0, initialRight: 18, initialBottom: 118 });
 
   const isReceiver = activeCall?.mode === 'receiver';
   const isConnected = callStatus === 'connected';
@@ -75,6 +80,96 @@ function VideoCallOverlay({
     return activeCall.receiverEmail ? `Calling ${activeCall.receiverEmail}` : 'Calling';
   }, [activeCall, isReceiver]);
 
+  const getRemoteAvatar = () => {
+    // Return remote user's avatar/photo URL if available
+    if (isReceiver && activeCall?.callerEmail) {
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(activeCall.callerName || activeCall.callerEmail)}&background=random&size=128`;
+    }
+    if (activeCall?.receiverEmail) {
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(activeCall.receiverEmail)}&background=random&size=128`;
+    }
+    return null;
+  };
+
+  const getCurrentUserAvatar = () => {
+    return currentUser?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.displayName || currentUser?.email || 'User')}&background=random&size=128`;
+  };
+
+  const formatCallStatus = () => {
+    if (isConnected) return formatDuration(durationSeconds);
+    if (callStatus === 'ringing') return 'Ringing...';
+    if (callStatus === 'connecting') return 'Connecting...';
+    if (callStatus === 'calling') return 'Calling...';
+    return 'Connecting...';
+  };
+
+  // Show/hide controls with auto-hide
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    if (isConnected) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setControlsVisible(false);
+      }, 4000);
+    }
+  }, [isConnected]);
+
+  const handleVideoClick = useCallback(() => {
+    if (controlsVisible) {
+      setControlsVisible(false);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    } else {
+      showControls();
+    }
+  }, [controlsVisible, showControls]);
+
+  // Drag functionality for local video
+  const handleLocalVideoMouseDown = useCallback((e) => {
+    if (!isConnected) return;
+    localVideoDragRef.current = {
+      isDragging: true,
+      startX: e.clientX || e.touches?.[0]?.clientX || 0,
+      startY: e.clientY || e.touches?.[0]?.clientY || 0,
+      initialRight: localVideoPosition.right,
+      initialBottom: localVideoPosition.bottom,
+    };
+    e.preventDefault();
+  }, [isConnected, localVideoPosition]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!localVideoDragRef.current.isDragging) return;
+    const dx = (e.clientX || e.touches?.[0]?.clientX || 0) - localVideoDragRef.current.startX;
+    const dy = (e.clientY || e.touches?.[0]?.clientY || 0) - localVideoDragRef.current.startY;
+    setLocalVideoPosition({
+      right: Math.max(10, Math.min(window.innerWidth - 180, localVideoDragRef.current.initialRight - dx)),
+      bottom: Math.max(100, Math.min(window.innerHeight - 100, localVideoDragRef.current.initialBottom + dy)),
+    });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    localVideoDragRef.current.isDragging = false;
+  }, []);
+
+  // Set up global mouse events for dragging
+  useEffect(() => {
+    if (isVisible) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleMouseMove, { passive: false });
+      window.addEventListener('touchend', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleMouseMove);
+      window.removeEventListener('touchend', handleMouseUp);
+    };
+  }, [isVisible, handleMouseMove, handleMouseUp]);
+
   const runCleanups = useCallback(() => {
     cleanupCallbacksRef.current.forEach((cleanup) => cleanup());
     cleanupCallbacksRef.current = [];
@@ -82,6 +177,10 @@ function VideoCallOverlay({
 
   const resetLocalState = useCallback(() => {
     runCleanups();
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -105,6 +204,9 @@ function VideoCallOverlay({
     setAudioEnabled(true);
     setVideoEnabled(true);
     setDurationSeconds(0);
+    setControlsVisible(true);
+    setRemoteVideoEnabled(true);
+    setLocalVideoPosition({ right: 18, bottom: 118 });
   }, [runCleanups]);
 
   const attachCleanup = useCallback((cleanup) => {
@@ -367,50 +469,122 @@ function VideoCallOverlay({
 
   if (!isVisible) return null;
 
+  const remoteAvatar = getRemoteAvatar();
+  const userAvatar = getCurrentUserAvatar();
+
   return (
     <div className={`video-overlay ${isFullscreen ? 'fullscreen' : 'minimized'} ${isConnected ? 'is-connected' : 'is-ringing'}`}>
-      <div className="video-stage">
-        <video ref={remoteVideoRef} autoPlay playsInline className={`video remote-video ${isConnected ? 'primary' : 'hidden-video'}`} />
-        <video ref={localVideoRef} autoPlay playsInline muted className={`video local-video ${isConnected ? 'secondary' : 'primary'}`} />
-        <div className="video-placeholder">
-          <strong>{callLabel}</strong>
-          <span>{isConnected ? formatDuration(durationSeconds) : callStatus === 'ringing' ? 'Ringing...' : 'Connecting...'}</span>
+      <div className="video-stage" onClick={handleVideoClick}>
+        {/* Remote video (full screen when connected) */}
+        <video 
+          ref={remoteVideoRef} 
+          autoPlay 
+          playsInline 
+          className={`video remote-video ${isConnected ? 'primary' : 'hidden-video'}`} 
+        />
+        
+        {/* Local video (floating PIP) */}
+        <video 
+          ref={localVideoRef} 
+          autoPlay 
+          playsInline 
+          muted 
+          className={`video local-video ${isConnected ? 'secondary' : 'primary'}`}
+          style={isConnected ? {
+            right: `${localVideoPosition.right}px`,
+            bottom: `${localVideoPosition.bottom}px`,
+          } : undefined}
+          onMouseDown={handleLocalVideoMouseDown}
+          onTouchStart={handleLocalVideoMouseDown}
+        />
+
+        {/* Call Info Header */}
+        <div className="call-info-header">
+          {remoteAvatar && (
+            <img 
+              src={remoteAvatar} 
+              alt="Caller" 
+              className="call-avatar"
+            />
+          )}
+          <div className="call-name">{callLabel}</div>
+          <div className="call-status">{formatCallStatus()}</div>
         </div>
 
+        {/* Video Placeholder (when not connected) */}
+        <div className={`video-placeholder ${!isConnected ? 'visible' : ''}`}>
+          {remoteAvatar && (
+            <img 
+              src={remoteAvatar} 
+              alt="Caller" 
+              className="video-placeholder-avatar"
+            />
+          )}
+          <strong>{callLabel}</strong>
+          <span>{formatCallStatus()}</span>
+        </div>
+
+        {/* Minimize button */}
         <button
           className="video-side-button video-minimize-button"
-          onClick={() => setIsFullscreen((value) => !value)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsFullscreen((value) => !value);
+          }}
           aria-label={isFullscreen ? 'Minimize call' : 'Fullscreen call'}
           title={isFullscreen ? 'Minimize call' : 'Fullscreen call'}
         >
           <span aria-hidden="true">{isFullscreen ? '↙' : '⛶'}</span>
         </button>
 
-        <div className="video-side-actions" aria-hidden="true">
-          <button type="button" className="video-side-button">👥</button>
-          <button type="button" className="video-side-button">💬</button>
-          <button type="button" className="video-side-button">🔄</button>
+        {/* Permissions error */}
+        {permissionError && <div className="video-call-error">{permissionError}</div>}
+
+        {/* Call Controls */}
+        <div className={`video-controls ${!controlsVisible ? 'hidden' : ''}`}>
+          <button 
+            className="video-control-button" 
+            onClick={toggleAudio} 
+            aria-label={audioEnabled ? 'Mute microphone' : 'Unmute microphone'} 
+            title={audioEnabled ? 'Mute microphone' : 'Unmute microphone'}
+          >
+            <span aria-hidden="true">{audioEnabled ? '🎤' : '🔇'}</span>
+          </button>
+          
+          <button 
+            className={`video-control-button ${videoEnabled ? '' : 'is-off'}`} 
+            onClick={toggleVideo} 
+            aria-label={videoEnabled ? 'Turn camera off' : 'Turn camera on'} 
+            title={videoEnabled ? 'Turn camera off' : 'Turn camera on'}
+          >
+            <span aria-hidden="true">{videoEnabled ? '📹' : '📷'}</span>
+          </button>
+          
+          <button 
+            className="video-control-button" 
+            aria-label="Switch camera" 
+            title="Switch camera"
+          >
+            <span aria-hidden="true">🔄</span>
+          </button>
+          
+          <button 
+            className="video-control-button" 
+            aria-label="Speaker" 
+            title="Speaker"
+          >
+            <span aria-hidden="true">🔊</span>
+          </button>
+          
+          <button 
+            className="video-control-button end-call-btn" 
+            onClick={endCall} 
+            aria-label="End call" 
+            title="End call"
+          >
+            <span aria-hidden="true">📞</span>
+          </button>
         </div>
-      </div>
-
-      {permissionError && <div className="video-call-error">{permissionError}</div>}
-
-      <div className="video-controls">
-        <button className="video-control-button more-button" aria-label="More options" title="More options">
-          <span aria-hidden="true">•••</span>
-        </button>
-        <button className={`video-control-button ${videoEnabled ? '' : 'is-off'}`} onClick={toggleVideo} aria-label={videoEnabled ? 'Turn camera off' : 'Turn camera on'} title={videoEnabled ? 'Turn camera off' : 'Turn camera on'}>
-          <span aria-hidden="true">{videoEnabled ? '▰' : '▱'}</span>
-        </button>
-        <button className={`video-control-button ${audioEnabled ? 'is-active' : 'is-off'}`} onClick={toggleAudio} aria-label={audioEnabled ? 'Mute microphone' : 'Unmute microphone'} title={audioEnabled ? 'Mute microphone' : 'Unmute microphone'}>
-          <span aria-hidden="true">{audioEnabled ? '🔊' : '🔇'}</span>
-        </button>
-        <button className={`video-control-button ${audioEnabled ? '' : 'is-off'}`} onClick={toggleAudio} aria-label={audioEnabled ? 'Mute microphone' : 'Unmute microphone'} title={audioEnabled ? 'Mute microphone' : 'Unmute microphone'}>
-          <span aria-hidden="true">{audioEnabled ? '🎙' : '⛔'}</span>
-        </button>
-        <button className="video-control-button end-call-btn" onClick={endCall} aria-label="End call" title="End call">
-          <span aria-hidden="true">☎</span>
-        </button>
       </div>
     </div>
   );
