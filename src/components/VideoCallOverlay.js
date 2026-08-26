@@ -57,7 +57,6 @@ function VideoCallOverlay({
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
   const [localVideoPosition, setLocalVideoPosition] = useState({ right: 18, bottom: 118 });
 
   const localVideoRef = useRef(null);
@@ -470,7 +469,6 @@ function VideoCallOverlay({
   if (!isVisible) return null;
 
   const remoteAvatar = getRemoteAvatar();
-  const userAvatar = getCurrentUserAvatar();
 
   return (
     <div className={`video-overlay ${isFullscreen ? 'fullscreen' : 'minimized'} ${isConnected ? 'is-connected' : 'is-ringing'}`}>
