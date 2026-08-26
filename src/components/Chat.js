@@ -18,12 +18,15 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
   const keepLatestVisibleRef = useRef(false);
   const userNearBottomRef = useRef(true);
   const [composerHeight, setComposerHeight] = useState(64);
+  const typingIndicatorHeight = 40; // Approximate height of typing indicator
 
   const isNearBottom = useCallback(() => {
     const messagePanel = messagesRef.current;
     if (!messagePanel) return true;
-    return messagePanel.scrollHeight - messagePanel.scrollTop - messagePanel.clientHeight < 72;
-  }, []);
+    // Account for typing indicator height when checking if near bottom
+    const typingOffset = typingUsers.length > 0 ? typingIndicatorHeight : 0;
+    return messagePanel.scrollHeight - messagePanel.scrollTop - messagePanel.clientHeight < (72 + typingOffset);
+  }, [typingUsers]);
 
   const updateNearBottomState = useCallback(() => {
     userNearBottomRef.current = isNearBottom();
@@ -33,10 +36,12 @@ function Chat({ messages, currentUserId, addMessage, typingUsers = [], onTypingC
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     const messagePanel = messagesRef.current;
     if (!messagePanel) return;
-    messagePanel.scrollTo({ top: messagePanel.scrollHeight, behavior });
+    // Scroll a bit further to ensure typing indicator is visible above keyboard
+    const typingOffset = typingUsers.length > 0 ? typingIndicatorHeight : 0;
+    messagePanel.scrollTo({ top: messagePanel.scrollHeight + typingOffset, behavior });
     userNearBottomRef.current = true;
     setNewMessageCount(0);
-  }, []);
+  }, [typingUsers]);
 
   const settleLatestMessages = useCallback(() => {
     [0, 80, 180, 360].forEach((delay) => {

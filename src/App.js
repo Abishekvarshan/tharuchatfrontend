@@ -19,6 +19,7 @@ import './App.css';
 const ALLOWED_EMAILS = new Set([
   'varsityabi@gmail.com',
   'shamilyrathnakumar@gmail.com',
+  'abishekvarshan2001@gmail.com',
 ]);
 
 function App() {
