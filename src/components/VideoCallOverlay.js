@@ -389,6 +389,11 @@ function VideoCallOverlay({
 
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    
+    // Watch call status and candidates BEFORE updating the status to 'connecting'
+    watchCallStatus(activeCall.callId);
+    watchCandidates(activeCall.callId, 'callerCandidates');
+    
     await update(callRef, {
       status: 'connecting',
       answer: {
@@ -396,9 +401,6 @@ function VideoCallOverlay({
         sdp: answer.sdp,
       },
     });
-
-    watchCallStatus(activeCall.callId);
-    watchCandidates(activeCall.callId, 'callerCandidates');
   }, [activeCall, createPeerConnection, currentUser, flushPendingCandidates, getLocalMedia, watchCallStatus, watchCandidates]);
 
   const endCall = useCallback(async () => {
