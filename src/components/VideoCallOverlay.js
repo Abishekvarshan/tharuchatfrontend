@@ -232,20 +232,31 @@ function VideoCallOverlay({
     const candidates = pendingCandidatesRef.current;
     pendingCandidatesRef.current = [];
 
+    console.log(`Flushing ${candidates.length} pending ICE candidates`); // Debug log
+
     for (const candidate of candidates) {
-      await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+      try {
+        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('Successfully added pending ICE candidate'); // Debug log
+      } catch (error) {
+        console.error('Error flushing pending ICE candidate:', error);
+      }
     }
   }, []);
 
   const addRemoteCandidate = useCallback(async (candidate) => {
     if (!candidate || !peerConnectionRef.current) return;
 
+    console.log('Received ICE candidate:', candidate); // Debug log
+
     if (!remoteDescriptionSetRef.current) {
+      console.log('Queuing candidate - remote description not set yet'); // Debug log
       pendingCandidatesRef.current.push(candidate);
       return;
     }
 
     try {
+      console.log('Adding ICE candidate to peer connection'); // Debug log
       await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (error) {
       console.error('Error adding ICE candidate:', error);
@@ -256,18 +267,29 @@ function VideoCallOverlay({
     const pc = new RTCPeerConnection(getPeerConfiguration());
     peerConnectionRef.current = pc;
 
-    pc.onicecandidate = (event) => {
-      if (!event.candidate) return;
+    console.log('Created RTCPeerConnection with config:', getPeerConfiguration()); // Debug log
 
+    pc.onicecandidate = (event) => {
+      if (!event.candidate) {
+        console.log('ICE gathering complete'); // Debug log
+        return;
+      }
+
+      console.log('Generated ICE candidate:', event.candidate); // Debug log
       const candidatePath = role === 'caller' ? 'callerCandidates' : 'receiverCandidates';
       const candidatesRef = databaseRef(realtimeDb, `calls/${id}/${candidatePath}`);
       set(push(candidatesRef), event.candidate.toJSON());
+    };
+
+    pc.onicegatheringstatechange = () => {
+      console.log('ICE gathering state:', pc.iceGatheringState); // Debug log
     };
 
     pc.ontrack = (event) => {
       const [remoteStream] = event.streams;
       if (remoteStream && remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
+        console.log('Remote track added successfully'); // Debug log
       }
     };
 
